@@ -1,0 +1,119 @@
+### Python function to solve the DSP with linear programming
+### Input: G, max lengths
+### Output: A minimum dominating set of G
+
+import pulp
+import networkx as nx
+import math
+import matplotlib.pyplot as plt
+import time
+
+def create_Graph(points, max_length):
+    G = nx.Graph()
+    # add nodes
+    k = 1
+    G.add_node(k, pos=(points[k-1]))
+    print("node", k, "added. coordinates: ", points[k-1])
+    while len(list(G)) < len(points):
+        k += 1
+        G.add_node(k, pos=(points[k-1]))
+        print("node", k, "added. coordinates: ", points[k-1])
+
+    # add edges, if length is less than max_length
+    seen_edge = set()
+    for k in range(1, len(points)+1):
+        for l in range(1, len(points)+1):
+            if k != l:
+                length = math.sqrt((points[k-1][0] - points[l-1][0])**2 + (points[k-1][1] - points[l-1][1])**2)
+                if length < max_length:
+                    # check if reverse arc is already in set
+                    if (l,k) not in seen_edge and (k,l) not in seen_edge:
+                        G.add_edge(k, l)
+                        seen_edge.add((k,l))
+                        print("edge", k, "to", l, "added")
+    return G
+
+
+def DSP_LP(Graph):
+    min_sets = []
+    y = pulp.LpVariable.dicts("y", Graph.nodes(), cat=pulp.LpBinary)
+    prob = pulp.LpProblem("MinimumDominatingSet", pulp.LpMinimize)
+    prob += pulp.lpSum(y)
+    for v in Graph.nodes():
+        prob += y[v] + pulp.lpSum([y[u] for u in Graph.neighbors(v)]) >= 1
+
+    prob.solve()
+
+    return pulp.value(prob.objective)
+
+    
+
+points = [
+[47698.35491553461, 77923.64355529193],
+[176627.18859639898, 142488.94821539056],
+[196829.62248453422, 190801.6072196709],
+[134785.5846269147, 182341.32591938227],
+[144379.62522796058, 222638.98158654757],
+[96976.09920786222, 188909.17587618623],
+[76682.71996077016, 237778.4323344333],
+[81365.48132678098, 266721.49994068407],
+[163347.42061655904, 247797.18650582712],
+[351813.6006496157, 336518.82066806685],
+[344542.89127614786, 361454.38660575915]
+]
+
+speed1 = 41.7 # km/h
+speed2 = 32.4 # km/h
+
+# make a list of maximum times from 0 to 5 hours in steps of 0.1 hours
+max_times = [x/10 for x in range(0, 51)]
+
+
+
+start = time.time()
+## asset type 1
+
+# make an empty list with the dimensions of the points list
+points1 = [[0,0] for i in range(len(points))]
+
+# devide al coordinates by the speed to get the time in hours instead of km
+for i in range(len(points)):
+    points1[i][0] = points[i][0]/(1000 * speed1)
+    points1[i][1] = points[i][1]/(1000 * speed1)
+
+min_set_sizes_type1 = []
+# determine the minimum dominating set for each maximum time
+for max_time in max_times:
+    Graph = create_Graph(points1, max_time)
+    min_set_sizes_type1.append(DSP_LP(Graph))
+    print("The minimum dominating set cardinality for a maximum time of", max_time, "hours is:", min_set_sizes_type1[-1])
+
+## asset type 2
+
+# make an empty list with the dimensions of the points list
+points2 = [[0,0] for i in range(len(points))]
+
+# devide al coordinates by the speed to get the time in hours instead of km
+for i in range(len(points)):
+    points2[i][0] = points[i][0]/(1000 * speed2)
+    points2[i][1] = points[i][1]/(1000 * speed2)
+
+min_set_sizes_type2 = []
+# determine the minimum dominating set for each maximum time
+for max_time in max_times:
+    Graph = create_Graph(points2, max_time)
+    min_set_sizes_type2.append(DSP_LP(Graph))
+    print("The minimum dominating set cardinality for a maximum time of", max_time, "hours is:", min_set_sizes_type2[-1])
+
+stop = time.time()
+print("The total time is:", round(stop-start,2), "seconds")
+
+
+
+# make a graph of the minimum dominating set lengths
+plt.plot(max_times, min_set_sizes_type1)
+plt.plot(max_times, min_set_sizes_type2)
+plt.legend(["Asset type 1", "Asset type 2"])
+plt.xlabel("Maximum reaction time [hours]")
+plt.ylabel("Minimum dominating set cardinality")
+plt.show()
